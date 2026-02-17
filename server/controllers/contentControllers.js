@@ -1,6 +1,7 @@
 import Content from "../models/Content.js";
 import Room from "../models/Room.js";
 import { deleteFileFromStorage } from "../utils/storage.js";
+import { deleteFromS3 } from "./s3Controller.js";
 
 /* ========== UPLOAD TEXT ========== */
 export const uploadText = async (req, res) => {
@@ -42,13 +43,26 @@ export const uploadText = async (req, res) => {
   }
 };
 
-/* ========== UPLOAD FILE ========== */
+
+
+
 export const uploadFile = async (req, res) => {
   try {
-    if (!req.file) {
+    const { fileName, filePath, fileType, fileSize } = req.body || {};
+
+    // 1) Validate input from frontend
+    if (!fileName || !filePath) {
       return res.status(400).json({
         success: false,
-        message: "File is required",
+        message: "fileName and filePath are required",
+      });
+    }
+
+    // 2) Resolve the user's room (assuming req.user.roomId is set by your auth middleware)
+    if (!req.user?.roomId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized: roomId missing on user context",
       });
     }
 
@@ -60,28 +74,71 @@ export const uploadFile = async (req, res) => {
       });
     }
 
+    // 3) Persist content metadata (S3 key is stored in filePath)
     const content = await Content.create({
       room: room._id,
       type: "file",
-      fileName: req.file.originalname,
-      filePath: `uploads/${req.file.filename}`,
-      fileType: req.file.mimetype,
-      fileSize: req.file.size,
+      fileName,
+      filePath,     // S3 key like "uploads/1700000000000-myfile.png"
+      fileType: fileType || null,
+      fileSize: fileSize || null,
     });
 
-    res.status(201).json({
+    // (Optional) If you want to return a GET URL (unsigned) for viewing:
+    // const region = process.env.AWS_REGION;
+    // const bucket = process.env.S3_BUCKET_NAME;
+    // const publicUrl = `https://${bucket}.s3.${region}.amazonaws.com/${filePath}`;
+
+    return res.status(201).json({
       success: true,
-      message: "File uploaded successfully",
+      message: "File metadata saved",
       content,
+      // publicUrl, // uncomment if you want to return it
     });
   } catch (error) {
     console.error("Upload file error:", error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Server error",
     });
   }
 };
+
+/* ========== UPLOAD FILE ========== */
+// export const uploadFile = async (req, res) => {
+//   try {
+
+
+//     const room = await Room.findOne({ roomId: req.user.roomId });
+//     if (!room) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Room not found",
+//       });
+//     }
+
+//     const content = await Content.create({
+//       room: room._id,
+//       type: "file",
+//       fileName: req.file.originalname,
+//       filePath: `uploads/${req.file.filename}`,
+//       fileType: req.file.mimetype,
+//       fileSize: req.file.size,
+//     });
+
+//     res.status(201).json({
+//       success: true,
+//       message: "File uploaded successfully",
+//       content,
+//     });
+//   } catch (error) {
+//     console.error("Upload file error:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Server error",
+//     });
+//   }
+// };
 
 /* ========== GET ALL CONTENTS FOR ROOM ========== */
 export const getRoomContents = async (req, res) => {
@@ -145,7 +202,8 @@ export const deleteContent = async (req, res) => {
 
     // Delete file from storage if file type
     if (content.type === "file" && content.filePath) {
-      await deleteFileFromStorage(content.filePath);
+      console.log("what is wrong ")
+      await deleteFromS3(content.filePath);
     }
 
     await Content.findByIdAndDelete(id);

@@ -53,32 +53,51 @@ function RoomPage() {
     }
   };
 
-  const handleUploadFile = async () => {
-    if (!file) {
-      showToast("Please select a file to upload", "error");
-      return;
-    }
+ const handleUploadFile = async () => {
+  if (!file) {
+    showToast("Please select a file to upload", "error");
+    return;
+  }
 
-    const formData = new FormData();
-    formData.append("file", file);
+  try {
+    // 1️⃣ Ask backend for S3 upload URL
+    const res = await API.post("/s3/upload-url", {
+      fileName: file.name,
+      fileType: file.type,
+    });
 
-    try {
-      await API.post("/contents/file", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      setFile(null);
-      closeModal();
-      fetchContents();
-      showToast("File uploaded successfully", "success");
-    } catch (err) {
-      console.error(err);
-     
-      showToast(
-        "failed to upload : " + (err.response?.data?.message || err.message),
-        "error"
-      );
-    }
-  };
+    const { uploadUrl, key } = res.data;
+
+    // 2️⃣ Upload file directly to S3
+    await fetch(uploadUrl, {
+      method: "PUT",
+      body: file,
+      headers: {
+        "Content-Type": file.type,
+      },
+    });
+
+    // 3️⃣ Save file info in your database (VERY IMPORTANT)
+    await API.post("/contents/file", {
+      fileName: file.name,
+      filePath: key,
+    });
+
+    setFile(null);
+    closeModal();
+    fetchContents();
+
+    showToast("File uploaded successfully", "success");
+
+  } catch (err) {
+    console.error(err);
+    showToast(
+      "Failed to upload: " + (err.response?.data?.message || err.message),
+      "error"
+    );
+  }
+};
+
 
   const handleDeleteContent = async (id) => {
     try {
@@ -116,7 +135,16 @@ function RoomPage() {
     setFile(null);
   };
 
-  const getFileURL = (path) => `http://localhost:5000/${path}`;
+  // const getFileURL = (path) => `http://localhost:5000/${path}`;
+
+  // utils/files.js (or top of your component)
+const S3BucketDomain = "https://quickroom.s3.ap-south-2.amazonaws.com";
+
+ function getFileURL(key = "") {
+  // Safely encode each path segment to handle spaces & special chars
+  const safeKey = key.split("/").map(encodeURIComponent).join("/");
+  return `${S3BucketDomain}/${safeKey}`;
+}
 
   const renderFilePreview = (item) => {
     const fileURL = getFileURL(item.filePath);
@@ -167,7 +195,7 @@ function RoomPage() {
                 </div>
               )}
 
-              {item.type === "file" && (
+              {/* {item.type === "file" && (
                 <div>
                   <p style={{ fontWeight: "600" }}>{item.fileName}</p>
                   {renderFilePreview(item)}
@@ -175,7 +203,25 @@ function RoomPage() {
                     Open Full File
                   </a>
                 </div>
-              )}
+              )} */}
+
+              {item.type === "file" && (
+  <div>
+    <p style={{ fontWeight: "600" }}>{item.fileName}</p>
+
+    {/* If you already have renderFilePreview, make sure it uses getFileURL too */}
+    {renderFilePreview(item)}
+
+    <a
+      href={getFileURL(item.filePath)}
+      target="_blank"
+      rel="noreferrer"
+      style={styles.link}
+    >
+      Open Full File
+    </a>
+  </div>
+)}
 
               <button style={styles.deleteBtn} onClick={() => handleDeleteContent(item._id)}>
                 Delete

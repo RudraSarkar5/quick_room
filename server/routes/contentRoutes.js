@@ -15,7 +15,7 @@ const router = express.Router();
 router.post("/text", authMiddleware, uploadText);
 
 // Upload file content
-router.post("/file", authMiddleware, upload.single("file"), uploadFile);
+router.post("/file", authMiddleware, uploadFile);
 
 // Get all content of the room
 router.get("/", authMiddleware, getRoomContents);

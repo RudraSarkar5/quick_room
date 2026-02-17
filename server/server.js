@@ -5,6 +5,7 @@ import cors from "cors";
 import morgan from "morgan";
 import roomRoutes from "./routes/roomRoutes.js";
 import contentRoutes from "./routes/contentRoutes.js";
+import s3HandlerRoute from "./routes/s3HandlerRoute.js"
 import { startRoomExpiryJob } from "./jobs/roomExpiryJob.js";
 
 dotenv.config();
@@ -40,6 +41,7 @@ app.use("/uploads", express.static("uploads"));
 //Routes
 app.use("/api/v1/rooms", roomRoutes);
 app.use("/api/v1/contents", contentRoutes);
+app.use("/api/v1/s3",s3HandlerRoute)
 
 
 //Server health check

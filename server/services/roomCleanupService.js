@@ -1,6 +1,7 @@
 import Room from "../models/Room.js";
 import Content from "../models/Content.js";
 import { deleteFileFromStorage } from "../utils/storage.js";
+import { deleteFromS3 } from "../controllers/s3Controller.js";
 
 export const deleteRoomWithContents = async (roomId) => {
   try {
@@ -26,7 +27,7 @@ export const deleteRoomWithContents = async (roomId) => {
     await Promise.all(
       contents
         .filter((item) => item.type === "file")
-        .map((item) => deleteFileFromStorage(item.filePath))
+        .map((item) => deleteFromS3(item.filePath))
     );
 
     console.log(`Files for room ${roomId} deleted.`);
