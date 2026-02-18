@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../services/api";
 import { showToast } from "../utils/Toast"; 
+import ClipLoader from "react-spinners/ClipLoader";
 
 function RoomPage() {
   const navigate = useNavigate();
@@ -14,6 +15,8 @@ function RoomPage() {
   const [selectedType, setSelectedType] = useState(null);
   const [selectedText, setSelectedText] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [loading, setLoading] = useState(false);
+
 
   
   useEffect(() => {
@@ -53,50 +56,63 @@ function RoomPage() {
     }
   };
 
- const handleUploadFile = async () => {
+const handleUploadFile = async () => {
   if (!file) {
     showToast("Please select a file to upload", "error");
     return;
   }
 
   try {
-    // 1️⃣ Ask backend for S3 upload URL
+    // Start loading
+    setLoading(true);
+
+    // Ask backend for S3 presigned POST, include file size
     const res = await API.post("/s3/upload-url", {
       fileName: file.name,
       fileType: file.type,
+      fileSize: file.size,
     });
 
-    const { uploadUrl, key } = res.data;
+    const { presignedPost, key } = res.data;
 
-    // 2️⃣ Upload file directly to S3
-    await fetch(uploadUrl, {
-      method: "PUT",
-      body: file,
-      headers: {
-        "Content-Type": file.type,
-      },
+    // Build form data for POST upload
+    const formData = new FormData();
+    Object.entries(presignedPost.fields).forEach(([k, v]) => {
+      formData.append(k, v);
+    });
+    formData.append("file", file);
+
+    // Upload file directly to S3
+    await fetch(presignedPost.url, {
+      method: "POST",
+      body: formData,
     });
 
-    // 3️⃣ Save file info in your database (VERY IMPORTANT)
+    // Save file info in your database
     await API.post("/contents/file", {
       fileName: file.name,
       filePath: key,
     });
 
+    // Reset state
     setFile(null);
     closeModal();
     fetchContents();
 
     showToast("File uploaded successfully", "success");
-
   } catch (err) {
     console.error(err);
     showToast(
       "Failed to upload: " + (err.response?.data?.message || err.message),
       "error"
     );
+  } finally {
+    // Stop loading
+    setLoading(false);
   }
 };
+
+
 
 
   const handleDeleteContent = async (id) => {
@@ -135,10 +151,7 @@ function RoomPage() {
     setFile(null);
   };
 
-  // const getFileURL = (path) => `http://localhost:5000/${path}`;
-
-  // utils/files.js (or top of your component)
-const S3BucketDomain = "https://quickroom.s3.ap-south-2.amazonaws.com";
+const S3BucketDomain = import.meta.env.VITE_S3_BUCKET_DOMAIN;
 
  function getFileURL(key = "") {
   // Safely encode each path segment to handle spaces & special chars
@@ -206,22 +219,27 @@ const S3BucketDomain = "https://quickroom.s3.ap-south-2.amazonaws.com";
               )} */}
 
               {item.type === "file" && (
-  <div>
-    <p style={{ fontWeight: "600" }}>{item.fileName}</p>
+                <div>
+                  <p style={{ fontWeight: "600" }}>
+                    {item.fileName.length > 20
+                      ? item.fileName.substring(0, 80) + "..."
+                      : item.fileName}
+                  </p>
 
-    {/* If you already have renderFilePreview, make sure it uses getFileURL too */}
-    {renderFilePreview(item)}
 
-    <a
-      href={getFileURL(item.filePath)}
-      target="_blank"
-      rel="noreferrer"
-      style={styles.link}
-    >
-      Open Full File
-    </a>
-  </div>
-)}
+                  {/* If you already have renderFilePreview, make sure it uses getFileURL too */}
+                  {renderFilePreview(item)}
+
+                 <a
+                    href={getFileURL(item.filePath)}
+                    download={item.fileName}   
+                    style={styles.link}
+                  >
+                    Download
+                  </a>
+
+                </div>
+          )}
 
               <button style={styles.deleteBtn} onClick={() => handleDeleteContent(item._id)}>
                 Delete
@@ -263,18 +281,29 @@ const S3BucketDomain = "https://quickroom.s3.ap-south-2.amazonaws.com";
               </>
             )}
 
-            {selectedType === "file" && (
-              <>
-                <h3>Upload File</h3>
-                <input
-                  type="file"
-                  accept="image/*,video/*,audio/*,application/pdf"
-                  onChange={(e) => setFile(e.target.files[0])}
-                />
-                <button style={styles.primaryBtn} onClick={handleUploadFile}>Upload</button>
-                <button style={styles.cancelBtn} onClick={closeModal}>Cancel</button>
-              </>
-            )}
+          {selectedType === "file" && (
+            <>
+              <h3>Upload File</h3>
+              <input
+                type="file"
+                onChange={(e) => setFile(e.target.files[0])}
+              />
+
+              {/* Show spinner while uploading */}
+              {loading ? (
+                <div style={{ display: "flex", justifyContent: "center", marginTop: "10px" }}>
+                  <ClipLoader loading={loading} size={30} color="#3498db" />
+                </div>
+              ) : (
+                <button style={styles.primaryBtn} onClick={handleUploadFile}>
+                  Upload
+                </button>
+              )}
+
+              <button style={styles.cancelBtn} onClick={closeModal}>Cancel</button>
+            </>
+          )}
+
           </div>
         </div>
       )}
