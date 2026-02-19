@@ -27,16 +27,20 @@ function RoomPage() {
     }
   }, []);
 
-  const fetchContents = async () => {
-    try {
-      const res = await API.get("/contents");
-      setContents(res.data.contents);
-    } catch (err) {
-      console.error(err);
-      setContents([]);
-      showToast("Failed to load contents", "error");
-    }
-  };
+ const fetchContents = async () => {
+  try {
+    setLoading(true); // START loading
+
+    const res = await API.get("/contents");
+    setContents(res.data.contents);
+  } catch (err) {
+    console.error(err);
+    setContents([]);
+    showToast("Failed to load contents", "error");
+  } finally {
+    setLoading(false); // STOP loading
+  }
+};
 
   const handleAddText = async () => {
     if (!text.trim()) {
@@ -179,6 +183,13 @@ const S3BucketDomain = import.meta.env.VITE_S3_BUCKET_DOMAIN;
 
   return (
     <div style={styles.page}>
+
+      {loading && (
+  <div style={styles.loadingOverlay}>
+    <ClipLoader size={60} color="#1677ff" />
+  </div>
+)}
+
       {/* Header */}
       <div style={styles.header}>
         <h2>Room: {roomId}</h2>
@@ -328,6 +339,19 @@ const S3BucketDomain = import.meta.env.VITE_S3_BUCKET_DOMAIN;
 
 
 const styles = {
+  loadingOverlay: {
+  position: "fixed",
+  top: 0,
+  left: 0,
+  width: "100vw",
+  height: "100vh",
+  backgroundColor: "rgba(255,255,255,0.8)",
+  display: "flex",
+  justifyContent: "center",
+  alignItems: "center",
+  zIndex: 9999,
+},
+
   page: { minHeight: "100vh", backgroundColor: "#f4f6f9", padding: "30px", fontFamily: "Arial, sans-serif" },
   header: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "30px" },
   logoutBtn: { backgroundColor: "#ff4d4f", color: "white", border: "none", padding: "8px 14px", borderRadius: "6px", cursor: "pointer", marginRight: "10px" },
