@@ -18,6 +18,23 @@ function RoomPage() {
   const [loading, setLoading] = useState(false);
 
 
+const handleDownload = async () => {
+  const response = await fetch(getFileURL(item.filePath));
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = item.fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  window.URL.revokeObjectURL(url);
+};
+
+
+
   
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -237,6 +254,11 @@ const S3BucketDomain = import.meta.env.VITE_S3_BUCKET_DOMAIN;
                   >
                     Download
                   </a>
+
+                  <button onClick={handleDownload} style={styles.link}>
+  Download
+</button>
+
 
                 </div>
           )}
