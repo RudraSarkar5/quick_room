@@ -27,8 +27,8 @@ export const generateUploadUrl = async (req, res) => {
     const s3 = new S3Client({
       region,
       credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY,
-        secretAccessKey: process.env.AWS_SECRET_KEY,
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_KEY_ID,
         sessionToken: process.env.AWS_SESSION_TOKEN || undefined,
       },
     });
@@ -74,8 +74,8 @@ export async function deleteFromS3(key) {
     const s3 = new S3Client({
       region: process.env.AWS_REGION,
       credentials: {
-        accessKeyId: process.env.AWS_ACCESS_KEY,
-        secretAccessKey: process.env.AWS_SECRET_KEY,
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_KEY_ID,
         sessionToken: process.env.AWS_SESSION_TOKEN || undefined,
       },
     });
