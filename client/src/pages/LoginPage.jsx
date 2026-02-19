@@ -25,11 +25,9 @@ function LoginPage() {
 
       // Show success toast
       showToast("Login successful!", "success");
-
-      // Navigate after short delay to let toast be seen
-      setTimeout(() => {
-        navigate("/room");
-      }, 500);
+ 
+      navigate("/room");
+     
     } catch (err) {
       // Show error toast
       showToast(

@@ -18,24 +18,6 @@ function RoomPage() {
   const [loading, setLoading] = useState(false);
 
 
-const handleDownload = async () => {
-  const response = await fetch(getFileURL(item.filePath));
-  const blob = await response.blob();
-  const url = window.URL.createObjectURL(blob);
-
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = item.fileName;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-
-  window.URL.revokeObjectURL(url);
-};
-
-
-
-  
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) {
@@ -225,15 +207,6 @@ const S3BucketDomain = import.meta.env.VITE_S3_BUCKET_DOMAIN;
                 </div>
               )}
 
-              {/* {item.type === "file" && (
-                <div>
-                  <p style={{ fontWeight: "600" }}>{item.fileName}</p>
-                  {renderFilePreview(item)}
-                  <a href={getFileURL(item.filePath)} target="_blank" rel="noreferrer" style={styles.link}>
-                    Open Full File
-                  </a>
-                </div>
-              )} */}
 
               {item.type === "file" && (
                 <div>
@@ -247,17 +220,11 @@ const S3BucketDomain = import.meta.env.VITE_S3_BUCKET_DOMAIN;
                   {/* If you already have renderFilePreview, make sure it uses getFileURL too */}
                   {renderFilePreview(item)}
 
-                 <a
-                    href={getFileURL(item.filePath)}
-                    download={item.fileName}   
-                    style={styles.link}
-                  >
-                    Download
+            
+                   <a href={getFileURL(item.filePath)} target="_blank" rel="noreferrer" style={styles.link}>
+                    Get File
                   </a>
 
-                  <button onClick={handleDownload} style={styles.link}>
-  Download
-</button>
 
 
                 </div>
