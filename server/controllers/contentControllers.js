@@ -1,6 +1,5 @@
 import Content from "../models/Content.js";
 import Room from "../models/Room.js";
-import { deleteFileFromStorage } from "../utils/storage.js";
 import { deleteFromS3 } from "./s3Controller.js";
 
 /* ========== UPLOAD TEXT ========== */
@@ -104,66 +103,62 @@ export const uploadFile = async (req, res) => {
   }
 };
 
-/* ========== UPLOAD FILE ========== */
-// export const uploadFile = async (req, res) => {
-//   try {
 
-
-//     const room = await Room.findOne({ roomId: req.user.roomId });
-//     if (!room) {
-//       return res.status(404).json({
-//         success: false,
-//         message: "Room not found",
-//       });
-//     }
-
-//     const content = await Content.create({
-//       room: room._id,
-//       type: "file",
-//       fileName: req.file.originalname,
-//       filePath: `uploads/${req.file.filename}`,
-//       fileType: req.file.mimetype,
-//       fileSize: req.file.size,
-//     });
-
-//     res.status(201).json({
-//       success: true,
-//       message: "File uploaded successfully",
-//       content,
-//     });
-//   } catch (error) {
-//     console.error("Upload file error:", error);
-//     res.status(500).json({
-//       success: false,
-//       message: "Server error",
-//     });
-//   }
-// };
-
-/* ========== GET ALL CONTENTS FOR ROOM ========== */
-export const getRoomContents = async (req, res) => {
+//get room with all contents [ used aggregation ]
+export const getRoomWithContents = async (req, res) => {
   try {
-    
-    const room = await Room.findOne({ roomId: req.user.roomId });
-    console.log("the room is : ",room)
-    if (!room) {
+    const result = await Room.aggregate([
+      {
+        $match: { roomId: req.user.roomId },
+      },
+
+      {
+        $lookup: {
+          from: "contents",        // MongoDB collection name
+          localField: "_id",
+          foreignField: "room",
+          as: "contents",
+        },
+      },
+
+      {
+        $unwind: {
+          path: "$contents",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
+
+      {
+        $sort: { "contents.createdAt": -1 },
+      },
+
+      {
+        $group: {
+          _id: "$_id",
+          roomId: { $first: "$roomId" },
+          key: { $first: "$key" },
+          createdAt: { $first: "$createdAt" },
+          updatedAt: { $first: "$updatedAt" },
+          contents: { $push: "$contents" },
+        },
+      },
+    ]);
+
+    if (!result.length) {
       return res.status(404).json({
         success: false,
         message: "Room not found",
       });
     }
 
-    const contents = await Content.find({ room: room._id }).sort({
-      createdAt: -1,
-    });
-    console.log(" vaue is ", contents )
-
     res.status(200).json({
       success: true,
-      contents,
+      room: result[0],
     });
+
   } catch (error) {
-    console.error("Get room contents error:", error);
+    console.error("Aggregate error:", error);
+
     res.status(500).json({
       success: false,
       message: "Server error",
@@ -171,7 +166,8 @@ export const getRoomContents = async (req, res) => {
   }
 };
 
-/* ========== DELETE CONTENT BY ID ========== */
+
+//delete content by id
 export const deleteContent = async (req, res) => {
   try {
     const { id } = req.params;
@@ -202,8 +198,7 @@ export const deleteContent = async (req, res) => {
 
     // Delete file from storage if file type
     if (content.type === "file" && content.filePath) {
-      console.log("what is wrong ")
-      await deleteFromS3(content.filePath);
+        await deleteFromS3(content.filePath);
     }
 
     await Content.findByIdAndDelete(id);

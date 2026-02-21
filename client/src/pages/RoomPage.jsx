@@ -16,31 +16,77 @@ function RoomPage() {
   const [selectedText, setSelectedText] = useState(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [timeLeft, setTimeLeft] = useState("");
+  const [createdAt, setCreatedAt] = useState(null);
 
 
-  useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (!token) {
-      navigate("/");
-    } else {
-      fetchContents();
-    }
-  }, []);
+useEffect(() => {
+  const token = localStorage.getItem("token");
 
- const fetchContents = async () => {
+  if (!token) {
+    navigate("/");
+    return;
+  }
+
+  fetchContents();
+}, []);
+
+const fetchContents = async () => {
+  setLoading(true);
+
   try {
-    setLoading(true); // START loading
-
     const res = await API.get("/contents");
-    setContents(res.data.contents);
+
+    const room = res.data?.room;
+
+    // Room missing → deleted / expired
+    if (!room) {
+      showToast("Room not found or expired", "error");
+      localStorage.clear();
+      navigate("/");
+      return;
+    }
+
+    const roomCreatedAt = room.createdAt;
+
+    // Missing createdAt
+    if (!roomCreatedAt) {
+      showToast("Room data invalid", "error");
+      localStorage.clear();
+      navigate("/");
+      return;
+    }
+
+    //  Check expiry (1 day)
+    const createdTime = new Date(roomCreatedAt).getTime();
+    const now = Date.now();
+    const expiryMs = 24 * 60 * 60 * 1000;
+
+    if (now - createdTime > expiryMs) {
+      showToast("Room has expired", "error");
+      localStorage.clear();
+      navigate("/");
+      return;
+    }
+
+    // Room valid → use populated contents
+    setContents(room.contents || []);
+    setCreatedAt(roomCreatedAt);
+
   } catch (err) {
-    console.error(err);
-    setContents([]);
-    showToast("Failed to load contents", "error");
+    console.error("Fetch contents error:", err);
+
+    showToast(
+      err.response?.data?.message || "Failed to load room",
+      "error"
+    );
+
+    navigate("/");
   } finally {
-    setLoading(false); // STOP loading
+    setLoading(false);
   }
 };
+
 
   const handleAddText = async () => {
     if (!text.trim()) {
@@ -181,27 +227,68 @@ const S3BucketDomain = import.meta.env.VITE_S3_BUCKET_DOMAIN;
     return null;
   };
 
+  useEffect(() => {
+  if (!createdAt) return;
+
+  // const ROOM_DURATION = 24 * 60 * 60 * 1000; // 🕒 1 day
+  const ROOM_DURATION = 24 * 60 * 60 * 1000;
+
+  const interval = setInterval(() => {
+    const createdTime = new Date(createdAt).getTime();
+    const now = Date.now();
+
+    const remaining = ROOM_DURATION - (now - createdTime);
+
+    if (remaining <= 0) {
+      setTimeLeft("Expired");
+      clearInterval(interval);
+      return;
+    }
+
+    const hours = Math.floor((remaining / (1000 * 60 * 60)) % 24);
+    const minutes = Math.floor((remaining / (1000 * 60)) % 60);
+    const seconds = Math.floor((remaining / 1000) % 60);
+
+    setTimeLeft(`${hours}h ${minutes}m ${seconds}s`);
+  }, 1000);
+
+  return () => clearInterval(interval);
+}, [createdAt]);
+
   return (
     <div style={styles.page}>
 
-      {loading && (
-  <div style={styles.loadingOverlay}>
-    <ClipLoader size={60} color="#1677ff" />
-  </div>
-)}
-
-      {/* Header */}
-      <div style={styles.header}>
-        <h2>Room: {roomId}</h2>
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
-          <button style={styles.logoutBtn} onClick={handleLogout}>
-            Logout
-          </button>
-          <button style={styles.deleteRoomBtn} onClick={() => setShowDeleteConfirm(true)}>
-            Delete Room
-          </button>
+      {/* 🔴 TOP DISCLAIMER — FIRST ELEMENT */}
+      {timeLeft && (
+        <div style={styles.topBanner}>
+          ⏳ Room will expire in {timeLeft}
         </div>
+      )}
+
+      {loading && (
+        <div style={styles.loadingOverlay}>
+          <ClipLoader size={60} color="#1677ff" />
+        </div>
+      )}
+
+    {/* Header */}
+    <div style={styles.header}>
+      <h2>Room: {roomId}</h2>
+
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px" }}>
+        <button style={styles.logoutBtn} onClick={handleLogout}>
+          Logout
+        </button>
+
+        <button
+          style={styles.deleteRoomBtn}
+          onClick={() => setShowDeleteConfirm(true)}
+        >
+          Delete Room
+        </button>
       </div>
+
+    </div>
 
       {/* Room Contents */}
       <div style={styles.contentContainer}>
@@ -339,19 +426,8 @@ const S3BucketDomain = import.meta.env.VITE_S3_BUCKET_DOMAIN;
 
 
 const styles = {
-  loadingOverlay: {
-  position: "fixed",
-  top: 0,
-  left: 0,
-  width: "100vw",
-  height: "100vh",
-  backgroundColor: "rgba(255,255,255,0.8)",
-  display: "flex",
-  justifyContent: "center",
-  alignItems: "center",
-  zIndex: 9999,
-},
-
+  loadingOverlay: { position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", backgroundColor: "rgba(255,255,255,0.8)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 9999 },
+  topBanner: { width: "100%", backgroundColor: "#ff4d4f", color: "white", padding: "12px", textAlign: "center", fontWeight: "600", fontSize: "16px", borderRadius: "8px", marginBottom: "20px" },
   page: { minHeight: "100vh", backgroundColor: "#f4f6f9", padding: "30px", fontFamily: "Arial, sans-serif" },
   header: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "30px" },
   logoutBtn: { backgroundColor: "#ff4d4f", color: "white", border: "none", padding: "8px 14px", borderRadius: "6px", cursor: "pointer", marginRight: "10px" },

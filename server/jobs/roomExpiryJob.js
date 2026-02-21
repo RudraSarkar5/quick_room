@@ -4,7 +4,9 @@ import { deleteRoomWithContents } from "../services/roomCleanupService.js";
 
 //Job will start in every 1 hour
 export const startRoomExpiryJob = () => {
+  
   const expiryDays = Number(process.env.ROOM_EXPIRY_DAYS);
+  
 
   if (!expiryDays || isNaN(expiryDays)) {
     console.error("Invalid ROOM_EXPIRY_DAYS in .env");
@@ -20,9 +22,7 @@ export const startRoomExpiryJob = () => {
       now.getTime() - expiryDays * 24 * 60 * 60 * 1000
     );
 
-
-
-    try {
+     try {
       const expiredRooms = await Room.find(
         { createdAt: { $lte: expiryCutoff } },
         { roomId: 1 }

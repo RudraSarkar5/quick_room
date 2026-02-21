@@ -11,4 +11,6 @@ router.post("/", createOrLoginRoom);
 // Delete a room with all delete
 router.delete("/:roomId", authMiddleware, deleteRoom);
 
+
+
 export default router;

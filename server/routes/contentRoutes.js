@@ -2,11 +2,11 @@ import express from "express";
 import {
   uploadText,
   uploadFile,
-  getRoomContents,
+  getRoomWithContents,
   deleteContent,
 } from "../controllers/contentControllers.js";
 import authMiddleware from "../middleware/authMiddleware.js";
-import upload from "../middleware/uploadMiddleware.js"
+
 
 const router = express.Router();
 
@@ -18,7 +18,7 @@ router.post("/text", authMiddleware, uploadText);
 router.post("/file", authMiddleware, uploadFile);
 
 // Get all content of the room
-router.get("/", authMiddleware, getRoomContents);
+router.get("/", authMiddleware, getRoomWithContents);
 
 //Delete content by Id
 router.delete("/:id", authMiddleware, deleteContent);
